@@ -11,6 +11,9 @@ s3_permissions/s3_permissions
 ### virtualenv
 get_all_boards/get_all_boards
 
+## exporters
+exporters/exported
+
 # Taken from https://github.com/github/gitignore/blob/master/Python.gitignore
 # Byte-compiled / optimized / DLL files
 __pycache__/
