@@ -24,7 +24,7 @@ python dash_to_json.py create -f my_timeboard.json -a your_api_key_here -p your_
 
 def getAll(filter=None):
     all_boards = api.Dashboard.get_all()['dashboards']
-    logging.info(pformat(all_boards))
+    logging.debug(pformat(all_boards))
     if filter:
         return [dash for dash in all_boards if apply_filter(dash['title'], filter)]
     else:
@@ -32,13 +32,24 @@ def getAll(filter=None):
 
 def apply_filter(title, filters):
     for f in filters:
-        logging.info('Filter: %s' % f)
         if re.search(f, title):
             return True
     return False
 
+def write_to_file(title, data):
+    logging.debug('Write to file')
+    try:
+        os.mkdir(outputdir)
+    except FileExistsError:
+        pass
+    filename = "".join([ c if c.isalnum() else "_" for c in title ])
+    filename = os.path.join(outputdir, 'dashboard_' + filename + '.json')
+    with open(filename, 'w') as f:
+        logging.info('Dump to %s' % filename)
+        json.dump(data, f, indent=2)
+
 def print_error(msg):
-    print("\nERROR: {}\n".format(msg))
+    logging.error(msg)
     parser.print_help()
     sys.exit(1)
 
@@ -48,6 +59,7 @@ if __name__ == '__main__':
     parser.add_argument('-F', help='Dashobard title filters (regex)', action='append', required=False)
     parser.add_argument('-a', help='Datadog API key', required=False)
     parser.add_argument('-p', help='Datadog APP key', required=False)
+    parser.add_argument('-o', help='Outputdir (default "./export")', default='./export')
 
     args = parser.parse_args()
 
@@ -55,6 +67,7 @@ if __name__ == '__main__':
     app_key = args.p if args.p else os.environ.get('DD_APP_KEY'),
     dashboard_id = args.d
     filters = [r"{}".format(f) for f in args.F]
+    outputdir = args.o
 
     logging.debug(pformat(filters))
 
@@ -69,8 +82,8 @@ if __name__ == '__main__':
     options = {
         'api_key': api_key,
         'app_key': app_key,
-         'api_host': 'https://api.datadoghq.eu',
-         'hostname_from_config': False
+        'api_host': 'https://api.datadoghq.eu',
+        'hostname_from_config': False
 
     }
 
@@ -79,21 +92,21 @@ if __name__ == '__main__':
 
     if dashboard_id:
         try:
+            logging.info('Get dashboard with ID %s' % dashboard_id)
             dashboard = api.Dashboard.get(dashboard_id)
-            d = json.loads(dashboard)
-            print(d)
-        except:
-            pass
+            logging.debug(dashboard)
+            write_to_file(dashboard_id, dashboard)
+        except BaseException as e:
+            logging.error('Failed with %s' % e)
     if filters:
         try:
             dashboards = getAll(filters)
             for dash in dashboards:
-                logging.info(dash.title)
-                logging.info(dash.id)
+                logging.info('Get dashboard %s (%s)' % (dash['title'], dash['id']))
                 dashboard = api.Dashboard.get(dash['id'])
-                d = json.loads(dashboard)
-                print(d)
-        except:
-            pass
+                logging.debug(dashboard)
+                write_to_file(dash['title'], dashboard)
+        except BaseException as e:
+            logging.error('Failed with %s' % e)
 
     sys.exit(0)
